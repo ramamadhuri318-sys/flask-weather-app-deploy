@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Flask Weather App</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 40px;
+      }
+      .container {
+        max-width: 480px;
+        margin: 0 auto;
+      }
+      input[type="text"] {
+        width: 100%;
+        padding: 8px;
+        margin-bottom: 12px;
+      }
+      button {
+        padding: 8px 16px;
+      }
+      .card {
+        margin-top: 20px;
+        padding: 16px;
+        border: 1px solid #ddd;
+        border-radius: 6px;
+      }
+      .error {
+        color: #b00020;
+        margin-top: 10px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>Flask Weather App</h1>
+
+      <form method="post">
+        <label for="city">Enter city name:</label><br />
+        <input
+          id="city"
+          name="city"
+          type="text"
+          placeholder="e.g. Hyderabad"
+          autocomplete="off"
+        />
+        <button type="submit">Get Weather</button>
+      </form>
+
+      {% if error %}
+      <p class="error">{{ error }}</p>
+      {% endif %}
+
+      {% if weather %}
+      <div class="card">
+        <h2>{{ weather.city }}</h2>
+        <p><strong>Temperature:</strong> {{ weather.temp }} °C</p>
+        <p><strong>Feels like:</strong> {{ weather.feels_like }} °C</p>
+        <p><strong>Conditions:</strong> {{ weather.description }}</p>
+      </div>
+      {% endif %}
+    </div>
+  </body>
+</html>
+
