@@ -5,9 +5,8 @@ ENV PYTHONUNBUFFERED=1
 
 WORKDIR /app
 
-# Add curl (optional but helpful for debugging)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential curl \
+    build-essential \
  && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
