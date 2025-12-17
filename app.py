@@ -22,8 +22,12 @@ def index():
         else:
             try:
                 url = "https://api.openweathermap.org/data/2.5/weather"
-                params = {"q": city, "appid": OPENWEATHER_API_KEY, "units": "metric"}
-                response = requests.get(url, params=params, timeout=8)
+                params = {
+                    "q": city,
+                    "appid": OPENWEATHER_API_KEY,
+                    "units": "metric",
+                }
+                response = requests.get(url, params=params, timeout=10)
                 data = response.json()
 
                 if response.status_code != 200:
@@ -44,5 +48,4 @@ def index():
 
 
 if __name__ == "__main__":
-    # local dev only; in Docker we use gunicorn
     app.run(host="0.0.0.0", port=8000, debug=True)
