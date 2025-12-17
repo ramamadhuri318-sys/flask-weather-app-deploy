@@ -12,53 +12,57 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup SSH
+      - name: Setup SSH key
         shell: bash
         run: |
           mkdir -p ~/.ssh
-          # IMPORTANT: printf preserves multiline key correctly
+          # Use printf (not echo) to preserve multiline private key
           printf '%s' "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/ec2_key.pem
           chmod 600 ~/.ssh/ec2_key.pem
           ssh-keyscan -H "${{ secrets.EC2_HOST }}" >> ~/.ssh/known_hosts
 
-      - name: Test SSH connectivity
+      - name: Test SSH connection
         shell: bash
         run: |
           ssh -o BatchMode=yes -o IdentitiesOnly=yes -i ~/.ssh/ec2_key.pem \
-            "${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}" "echo 'SSH OK'"
+            "${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}" "echo SSH_OK"
 
       - name: Deploy on EC2
         shell: bash
         run: |
           ssh -o IdentitiesOnly=yes -i ~/.ssh/ec2_key.pem \
-            "${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}" << EOF
+            "${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}" << 'EOF'
             set -e
 
             APP_DIR="${{ secrets.EC2_APP_DIR }}"
             REPO_URL="https://github.com/${{ github.repository }}.git"
 
-            # Ensure tools exist
+            echo "==> Installing/starting Docker & Git (if needed)..."
             sudo dnf install -y git docker || true
             sudo systemctl enable --now docker
 
-            # Ensure app dir + repo exist
-            if [ ! -d "\$APP_DIR/.git" ]; then
-              mkdir -p "\$APP_DIR"
-              git clone "\$REPO_URL" "\$APP_DIR"
+            echo "==> Stop Apache (port 80 conflict) if running..."
+            sudo systemctl stop httpd >/dev/null 2>&1 || true
+
+            echo "==> Preparing app directory..."
+            if [ ! -d "$APP_DIR/.git" ]; then
+              mkdir -p "$APP_DIR"
+              git clone "$REPO_URL" "$APP_DIR"
             fi
 
-            cd "\$APP_DIR"
+            cd "$APP_DIR"
+
+            echo "==> Pulling latest code..."
             git fetch origin main
             git reset --hard origin/main
 
-            # Write env file
+            echo "==> Writing env file..."
             printf "OPENWEATHER_API_KEY=%s\n" "${{ secrets.OPENWEATHER_API_KEY }}" > /home/ec2-user/weather.env
 
-            # Stop Apache if it’s using port 80
-            sudo systemctl stop httpd >/dev/null 2>&1 || true
-
-            # Build & run
+            echo "==> Building Docker image..."
             sudo docker build -t flask-weather-app:latest .
+
+            echo "==> Restarting container..."
             sudo docker rm -f flask-weather-app >/dev/null 2>&1 || true
             sudo docker run -d --name flask-weather-app \
               --restart unless-stopped \
@@ -66,5 +70,8 @@ jobs:
               --env-file /home/ec2-user/weather.env \
               flask-weather-app:latest
 
+            echo "==> Container status:"
             sudo docker ps
+
+            echo "==> Done."
           EOF
