@@ -9,8 +9,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Write SSH key
         run: |
@@ -18,58 +17,15 @@ jobs:
           printf '%s' "${{ secrets.EC2_SSH_KEY }}" | tr -d '\r' > ~/.ssh/ec2_key.pem
           chmod 600 ~/.ssh/ec2_key.pem
 
-      - name: Network check (port 22)
+      - name: Check if port 22 is reachable
         run: |
-          echo "Checking SSH port 22 on ${{ secrets.EC2_HOST }} ..."
+          echo "Host: ${{ secrets.EC2_HOST }}"
           timeout 8 bash -lc "cat < /dev/null > /dev/tcp/${{ secrets.EC2_HOST }}/22" \
-            && echo "Port 22 reachable ✅" \
-            || (echo "Port 22 NOT reachable ❌ (Security Group / NACL issue)" && exit 1)
+            && echo "✅ Port 22 reachable" \
+            || (echo "❌ Port 22 NOT reachable (Security Group/NACL/Host wrong)" && exit 1)
 
-      - name: Add known_hosts (non-fatal)
-        run: |
-          ssh-keyscan -H -t rsa,ed25519 "${{ secrets.EC2_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null || true
-
-      - name: SSH test (prints useful error)
+      - name: SSH test
         run: |
           ssh -vvv -o StrictHostKeyChecking=no -o ConnectTimeout=15 \
             -i ~/.ssh/ec2_key.pem \
-            "${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}" "echo SSH_OK && uname -a"
-
-      - name: Deploy on EC2
-        run: |
-          ssh -o StrictHostKeyChecking=no -o ConnectTimeout=15 \
-            -i ~/.ssh/ec2_key.pem \
-            "${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}" "bash -s" << 'EOF'
-          set -e
-
-          APP_DIR="/home/ec2-user/flask-weather-app-vscode"
-          REPO_URL="https://github.com/${GITHUB_REPOSITORY}.git"
-
-          sudo dnf install -y git docker >/dev/null 2>&1 || true
-          sudo systemctl enable --now docker
-          sudo systemctl stop httpd >/dev/null 2>&1 || true
-
-          if [ ! -d "$APP_DIR/.git" ]; then
-            git clone "$REPO_URL" "$APP_DIR"
-          fi
-
-          cd "$APP_DIR"
-          git fetch origin main
-          git reset --hard origin/main
-
-          printf "OPENWEATHER_API_KEY=%s\n" "${OPENWEATHER_API_KEY}" > /home/ec2-user/weather.env
-          chmod 600 /home/ec2-user/weather.env
-
-          sudo docker build -t flask-weather-app:latest .
-          sudo docker rm -f flask-weather-app >/dev/null 2>&1 || true
-
-          sudo docker run -d --name flask-weather-app \
-            --restart unless-stopped \
-            -p 80:8000 \
-            --env-file /home/ec2-user/weather.env \
-            flask-weather-app:latest
-
-          sudo docker ps
-          EOF
-        env:
-          OPENWEATHER_API_KEY: ${{ secrets.OPENWEATHER_API_KEY }}
+            "${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}" "echo SSH_OK"
