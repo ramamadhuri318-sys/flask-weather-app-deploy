@@ -21,9 +21,7 @@ jobs:
         run: |
           echo "Host: ${{ secrets.EC2_HOST }}"
           timeout 8 bash -lc "cat < /dev/null > /dev/tcp/${{ secrets.EC2_HOST }}/22" \
-            && echo "✅ Port 22 reachable" \
-            || (echo "❌ Port 22 NOT reachable (Security Group/NACL/Host wrong)" && exit 1)
-
+         
       - name: SSH test
         run: |
           ssh -vvv -o StrictHostKeyChecking=no -o ConnectTimeout=15 \
